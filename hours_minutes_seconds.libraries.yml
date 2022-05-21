@@ -1,0 +1,6 @@
+hours_minutes_seconds:
+  js:
+    js/hours-minutes-seconds.js: {}
+  dependencies:
+    - core/jquery
+    - core/drupalSettings

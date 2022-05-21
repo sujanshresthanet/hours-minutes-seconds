@@ -1,0 +1,109 @@
+<?php
+
+/**
+ * @file
+ * Contains hours_minutes_seconds.module..
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function hours_minutes_seconds_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the hours_minutes_seconds module.
+    case 'help.page.hours_minutes_seconds':
+    $output = '';
+    $output .= '<h3>' . t('About') . '</h3>';
+    $output .= '<p>' . t('Provides a field for Hours, Minutes and Seconds stored as seconds.') . '</p>';
+    return $output;
+
+    default:
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function hours_minutes_seconds_theme() {
+  $theme = array(
+    'hour_minutes_seconds' => array(
+      'variables' => array('value' => 0, 'format' => 'h:mm', 'leading_zero' => TRUE, 'running_since' => 0, 'offset' => 0, 'default_value' => 0),
+    ),
+    'hour_minutes_seconds_natural_language' => array(
+      'variables' => array('value' => 0, 'format' => 'w:d:h:m:s', 'separator' => ', ', 'last_separator' => ' and '),
+    ),
+  );
+  return $theme;
+}
+
+/**
+ * Preprocess theme hour_minutes_seconds.
+ *
+ * Attach JS when needed.
+ */
+function template_preprocess_hour_minutes_seconds(&$variables) {
+  $classes = array('hour_minutes_seconds', str_replace(':', '-', 'hour_minutes_seconds-format-' . $variables['format']));
+
+  $value = $variables['value'];
+  $offset = $variables['offset'];
+  $default_value = $variables['default_value'];
+
+  if ($variables['running_since'] !== 0) {
+    if (!$offset && !$default_value && $value) {
+      // Backwards compatible.
+      $offset = $value;
+      $default_value = $value;
+      $value = 0;
+    }
+    $value = $default_value;
+    // It is not possible to run longer then from 1970-01-01 00:00:01
+    $classes[] = 'hour_minutes_seconds-running';
+    // We also need to pass the running since value to JS.
+    // When format h is presented, the underlaying value can be at 3599
+    // The next second h needs to update.
+    // Be sure to pass running_since as time() (== GMT time)
+    if ($variables['running_since'] < 0) {
+      $variables['running_since'] = REQUEST_TIME;
+    }
+    $classes[] = 'hour_minutes_seconds-since-' . $variables['running_since'];
+    $classes[] = 'hour_minutes_seconds-offset-' . $offset;
+    $classes[] = 'hour_minutes_seconds-leading_zero-' . $variables['leading_zero'];
+    if ($offset) {
+      $value = (REQUEST_TIME - $variables['running_since']) + $offset;
+    }
+    $variables['#attached']['library'][] = 'hours_minutes_seconds/hours_minutes_seconds';
+    $variables['#attached']['drupalSettings']['hours_minutes_seconds']['servertime'] = REQUEST_TIME;
+    $variables['#attached']['drupalSettings']['hours_minutes_seconds']['factor_map'] = \Drupal::service('hours_minutes_seconds.hour_minutes_seconds')->factor_map();
+  }
+  $variables['classes'] = implode(' ' , $classes);
+  $variables['hour_minutes_seconds_value_formatted'] = \Drupal::service('hours_minutes_seconds.hour_minutes_seconds')->seconds_to_formatted($value, $variables['format'], $variables['leading_zero']);
+}
+
+
+/**
+ * Preprocess theme hour_minutes_seconds_natural_language.
+ *
+ * TODO: Investigate running since options (see theme_hour_minutes_seconds)
+ *   Would be cool if we can also make this format a 'Forrest Gump' format.
+ */
+function template_preprocess_hour_minutes_seconds_natural_language(&$variables) {
+
+  $hour_minutes_seconds_service = \Drupal::service('hours_minutes_seconds.hour_minutes_seconds');
+  $labels = $hour_minutes_seconds_service->factor_map(TRUE);
+
+  // Assign keyed values array.
+  $values = array_combine(
+    explode(':', $variables['format']),
+    explode(':', $hour_minutes_seconds_service->seconds_to_formatted($variables['value'], $variables['format'], TRUE))
+  );
+  $variables['labels'] = $labels;
+  $variables['formatted_values'] = array();
+  // Build array for output in template.
+  foreach ($values as $key => $value) {
+    if ($value != 0) {
+      $variables['formatted_values'][$key] = \Drupal::translation()->formatPlural($value, '@count ' . $labels[$key]['label single'], '@count ' . $labels[$key]['label multiple']);
+    }
+  }
+}

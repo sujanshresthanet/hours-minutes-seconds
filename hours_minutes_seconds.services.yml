@@ -1,0 +1,5 @@
+services:
+  hours_minutes_seconds.hour_minutes_seconds:
+    class: Drupal\hours_minutes_seconds\HoursMinutesSecondsService
+    arguments: []
+
